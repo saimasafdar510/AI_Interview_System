@@ -1,0 +1,58 @@
+question_group,answer,label
+python_equals_identity,"They compare things differently, I think.",poor
+python_equals_identity,== checks values and is checks whether two names point to the same object.,average
+python_equals_identity,"== compares values, while is compares object identity. Two separate lists can be equal with == but not be the same object with is, so identity checks are not a substitute for value comparison.",good
+python_mutable_defaults,The default is used if you leave it out.,poor
+python_mutable_defaults,A mutable default can be shared between calls because it is created once.,average
+python_mutable_defaults,"Python evaluates a function's default arguments once when the function is defined. A list default can therefore retain changes across calls. Use None as the default and create a new list inside the function when no value was supplied.",good
+python_list_tuple,One can be changed and the other cannot.,poor
+python_list_tuple,"Lists are mutable, while tuples are immutable after creation.",average
+python_list_tuple,"A list supports in-place updates such as append, while a tuple's element references cannot be reassigned after construction. I would use a list for a changing collection and a tuple for a fixed record, while remembering that a tuple can still contain a mutable object.",good
+python_exceptions,You catch errors when they happen.,poor
+python_exceptions,Handle the specific exception you expect and avoid catching everything.,average
+python_exceptions,"Catch the narrow exception that the operation can raise, then recover or add useful context. A broad except can hide programming errors, so I would let unexpected exceptions surface and use finally or a context manager for cleanup.",good
+sql_indexes,Indexes help queries run faster.,poor
+sql_indexes,An index can speed up lookups but adds storage and makes writes more expensive.,average
+sql_indexes,"An index can reduce the rows a database must scan for selective filters or joins. It consumes storage and adds work to inserts and updates, so I would inspect query plans and workload before indexing rather than adding one to every column.",good
+sql_joins,Joins put tables together.,poor
+sql_joins,"An inner join keeps matching rows, while a left join also keeps unmatched rows from the left table.",average
+sql_joins,"An inner join returns rows with matching join keys on both sides. A left join retains every left-side row and fills missing right-side columns with NULL. The choice depends on whether unmatched left-side records should remain in the result.",good
+sql_transactions,They let you undo a database change.,poor
+sql_transactions,A transaction groups changes so they can be committed together or rolled back.,average
+sql_transactions,"A transaction groups related operations into one unit. Commit makes the unit durable; rollback discards its changes. For example, moving money between accounts should debit and credit together so a partial update does not leave inconsistent balances.",good
+http_idempotency,It means doing the same request again.,poor
+http_idempotency,An idempotent request has the same intended effect when repeated.,average
+http_idempotency,"An operation is idempotent when repeating it produces the same intended server state as performing it once. A PUT that sets a resource to a specified representation is commonly idempotent, while repeated POST requests may create multiple resources unless the API adds deduplication.",good
+http_status_codes,The status code says what happened.,poor
+http_status_codes,"2xx indicates success, 4xx is a client-side issue, and 5xx is a server-side issue.",average
+http_status_codes,"HTTP status codes summarize the outcome of a request: 2xx indicates success, 4xx generally points to a request or authorization issue, and 5xx indicates a server failure. The exact code matters; for example, 401 means authentication is needed while 403 means access is refused.",good
+rest_validation,Check the input before saving it.,poor
+rest_validation,"Validate types, required fields, and allowed values at the API boundary.",average
+rest_validation,"Validate untrusted request data at the API boundary, including types, required fields, ranges, and allowed values. Return a consistent client error with field details, and enforce important invariants again in the domain or database layer where concurrent requests could bypass a check.",good
+cache_invalidation,Clear the cache when data changes.,poor
+cache_invalidation,Use a short expiration or invalidate affected entries after updates.,average
+cache_invalidation,"Cache invalidation must keep cached results from outliving the source data. A write can delete or update affected keys, while a time-to-live limits stale duration if an invalidation is missed. The right policy depends on consistency needs and how keys map to underlying records.",good
+unit_tests,Tests check that code works.,poor
+unit_tests,Test one behavior at a time and include normal and boundary inputs.,average
+unit_tests,"A focused unit test checks an observable behavior with controlled inputs and expected outputs. I would cover a normal case, relevant boundaries, and failure behavior, while keeping database or network dependencies mocked unless the test is specifically an integration test.",good
+race_conditions,Two things happen at the same time and cause a bug.,poor
+race_conditions,A race condition occurs when the result depends on timing between concurrent operations.,average
+race_conditions,"A race condition occurs when concurrent operations access shared state and the outcome depends on their timing. For example, two workers can both read the same balance before either writes. A transaction, lock, or atomic update can enforce the required invariant.",good
+normalization,Normalization organizes a database.,poor
+normalization,It reduces duplicated data by splitting related facts into tables.,average
+normalization,"Normalization structures relational tables to reduce unintended duplication and update anomalies. Related facts are stored once and connected by keys. The appropriate degree depends on the workload; denormalization may be chosen deliberately when read performance justifies its consistency cost.",good
+authentication_authorization,One checks users and one checks permissions.,poor
+authentication_authorization,Authentication verifies who the user is; authorization checks what they can access.,average
+authentication_authorization,"Authentication establishes an identity, often through credentials or a session. Authorization evaluates that identity's permissions for a specific action or resource. A valid login does not imply permission to access every resource.",good
+pagination,Return a few results at a time.,poor
+pagination,Pagination limits response size and lets clients request another page.,average
+pagination,"Pagination bounds the amount of data returned per request and gives clients a way to continue. Offset pagination is simple but can become slow or shift under concurrent inserts; cursor pagination can be more stable for large changing datasets.",good
+dependency_injection,Pass dependencies into the class instead of making them inside.,poor
+dependency_injection,It makes components easier to replace and test.,average
+dependency_injection,"Dependency injection supplies a component's collaborators from outside rather than constructing them internally. This reduces coupling and lets tests substitute a fake implementation. It is useful when dependencies vary, but a large container can obscure where objects come from.",good
+django_csrf,It protects a form from bad requests.,poor
+django_csrf,CSRF protection checks that a state-changing request came from the expected site context.,average
+django_csrf,"A CSRF token helps ensure a browser's state-changing request was initiated from a page rendered for the application, rather than being induced by another site using the user's cookies. It complements authentication and does not replace output escaping or authorization checks.",good
+database_constraints,They stop invalid values going into the database.,poor
+database_constraints,Constraints enforce rules like uniqueness and non-null values at the database level.,average
+database_constraints,"Database constraints enforce invariants even when writes come from multiple code paths or concurrent transactions. A unique constraint, for example, prevents duplicate keys under races where application-only checks could both pass. Application validation can improve messages but should not replace critical constraints.",good

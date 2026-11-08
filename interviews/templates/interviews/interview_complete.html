@@ -229,6 +229,18 @@
                             {% if item.evaluation %}
                                 <h4>Evaluation feedback</h4>
                                 <p>{{ item.evaluation.ai_feedback|default:"No feedback was saved for this answer." }}</p>
+                                {% if item.evaluation.experimental_ml_prediction %}
+                                    <p class="report-note"><strong>Experimental ML text category:</strong>
+                                        {% if item.evaluation.experimental_ml_prediction.status == "available" %}
+                                            {{ item.evaluation.experimental_ml_prediction.predicted_label|title }}
+                                        {% elif item.evaluation.experimental_ml_prediction.status == "model_missing" %}
+                                            Unavailable; train the optional model to enable predictions.
+                                        {% else %}
+                                            Unavailable for this answer.
+                                        {% endif %}
+                                        This is separate from the rule-based rubric and does not establish correctness or candidate ability.
+                                    </p>
+                                {% endif %}
                                 {% if item.evaluation.missing_concepts %}
                                     <h4>Missing concepts</h4>
                                     <ul>{% for concept in item.evaluation.missing_concepts %}<li>{{ concept }}</li>{% endfor %}</ul>

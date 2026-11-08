@@ -2,15 +2,20 @@
 import io
 import math
 import struct
+import tempfile
 import wave
+from pathlib import Path
 
 from unittest.mock import patch
+
+import joblib
+import sklearn
 
 import numpy as np
 
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, SimpleTestCase, TestCase
 from django.urls import reverse
 
 from roles.models import Role, Skill, Topic
@@ -25,6 +30,14 @@ from interviews.models import (
 from interviews.evaluation_engine import AnswerEvaluator
 from interviews.views import VOICE_ACCESS_SESSION_KEY, speaker_profile_key
 from interviews.speaker_verification import AudioSampleError, decode_wav
+from interviews.ml_answer_classifier import (
+    DATASET_PATH,
+    LABELS,
+    load_training_rows,
+    predict_answer_category,
+    split_training_rows,
+    train_and_save_model,
+)
 
 
 def make_voice_wav(duration=6, amplitude=9000, frequency=220):
@@ -256,6 +269,30 @@ class AnswerSubmissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         answer = self.assert_answer_was_evaluated("voice", "verified")
         self.assertEqual(answer.transcript, "The == operator compares values.")
+
+    def test_experimental_category_is_separate_and_labeled_in_report(self):
+        experimental_prediction = {
+            "status": "available",
+            "predicted_label": "average",
+            "model_version": sklearn.__version__,
+        }
+        with patch(
+            "interviews.evaluation_engine.predict_answer_category",
+            return_value=experimental_prediction,
+        ):
+            response = self.submit_answer("A concise answer.", "text")
+
+        self.assertEqual(response.status_code, 302)
+        answer = Answer.objects.get(interview_question=self.interview_question)
+        evaluation = Evaluation.objects.get(answer=answer)
+        expected_score = AnswerEvaluator(answer).calculate_scores()["total_score"]
+        self.assertEqual(evaluation.experimental_ml_prediction, experimental_prediction)
+        self.assertEqual(evaluation.total_score, expected_score)
+
+        report = self.client.get(reverse("interviews:interview_report", args=[self.session.id]))
+        self.assertContains(report, "Experimental ML text category:")
+        self.assertContains(report, "Average")
+        self.assertContains(report, "does not establish correctness or candidate ability")
 
     def test_unexpected_answer_source_falls_back_to_text(self):
         response = self.submit_answer(
@@ -942,6 +979,36 @@ class AnswerEvaluatorTests(TestCase):
         evaluator = AnswerEvaluator(self.answer)
         return evaluator.calculate_scores()
 
+    def test_experimental_prediction_is_saved_separately_from_rubric_scores(self):
+        transcript = "The == operator compares values and is checks object identity."
+        self.answer.transcript = transcript
+        expected_scores = AnswerEvaluator(self.answer).calculate_scores()
+        experimental_prediction = {
+            "status": "available",
+            "predicted_label": "average",
+            "model_version": sklearn.__version__,
+        }
+
+        with patch(
+            "interviews.evaluation_engine.predict_answer_category",
+            return_value=experimental_prediction,
+        ):
+            evaluation = AnswerEvaluator(self.answer).evaluate()
+
+        self.assertEqual(evaluation.experimental_ml_prediction, experimental_prediction)
+        self.assertEqual(evaluation.total_score, expected_scores["total_score"])
+
+    def test_prediction_exception_does_not_block_rule_based_evaluation(self):
+        with patch(
+            "interviews.evaluation_engine.predict_answer_category",
+            side_effect=RuntimeError("experimental failure"),
+        ):
+            evaluation = AnswerEvaluator(self.answer).evaluate()
+
+        self.assertEqual(evaluation.experimental_ml_prediction["status"], "prediction_error")
+        self.assertEqual(evaluation.total_score, 0)
+
+
     def test_reversed_answer_does_not_match_concepts_as_correct(self):
         reversed_answer = (
             "The == operator checks whether two variables refer to "
@@ -1205,3 +1272,64 @@ class AnswerEvaluatorTests(TestCase):
         )
 
         self.assertLess(scores["total_score"], 50.0)
+
+
+class ExperimentalAnswerClassifierTests(SimpleTestCase):
+    def test_training_test_split_keeps_prompt_groups_separate(self):
+        rows = load_training_rows(DATASET_PATH)
+        train_rows, test_rows = split_training_rows(rows)
+
+        self.assertFalse(
+            {row["group"] for row in train_rows}
+            & {row["group"] for row in test_rows}
+        )
+        self.assertEqual({row["label"] for row in train_rows}, set(LABELS))
+        self.assertEqual({row["label"] for row in test_rows}, set(LABELS))
+
+    def test_training_saves_loadable_versioned_pipeline_and_metrics(self):
+        rows = load_training_rows(DATASET_PATH)
+        good_example = next(row["answer"] for row in rows if row["label"] == "good")
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "answer-classifier.joblib"
+            metrics, metadata = train_and_save_model(DATASET_PATH, model_path)
+            result = predict_answer_category(good_example, model_path)
+
+        self.assertEqual(metadata["sklearn_version"], sklearn.__version__)
+        self.assertEqual(metrics["train_examples"] + metrics["test_examples"], len(rows))
+        self.assertGreaterEqual(metrics["macro_f1"], 0)
+        self.assertEqual(result["status"], "available")
+        self.assertIn(result["predicted_label"], LABELS)
+
+    def test_empty_invalid_and_missing_model_inputs_are_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            missing_model_path = Path(directory) / "missing.joblib"
+            self.assertEqual(
+                predict_answer_category("   ", missing_model_path)["status"],
+                "skipped_empty",
+            )
+            self.assertEqual(
+                predict_answer_category(None, missing_model_path)["status"],
+                "invalid_input",
+            )
+            self.assertEqual(
+                predict_answer_category("some answer", missing_model_path)["status"],
+                "model_missing",
+            )
+
+    def test_invalid_and_version_incompatible_artifacts_fail_gracefully(self):
+        with tempfile.TemporaryDirectory() as directory:
+            model_path = Path(directory) / "answer-classifier.joblib"
+            model_path.write_bytes(b"not a joblib model")
+            invalid_result = predict_answer_category("some answer", model_path)
+            self.assertEqual(invalid_result["status"], "prediction_error")
+
+            joblib.dump({
+                "metadata": {
+                    "format_version": 1,
+                    "sklearn_version": "0.0-incompatible",
+                    "joblib_version": joblib.__version__,
+                },
+                "pipeline": object(),
+            }, model_path)
+            version_result = predict_answer_category("some answer", model_path)
+            self.assertEqual(version_result["status"], "version_mismatch")

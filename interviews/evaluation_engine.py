@@ -1,5 +1,6 @@
 import re
 
+from .ml_answer_classifier import predict_answer_category
 from .models import Answer, Evaluation
 
 
@@ -996,6 +997,17 @@ class AnswerEvaluator:
             or bool(missing_concepts)
         )
 
+        try:
+            experimental_ml_prediction = predict_answer_category(
+                self.answer.transcript
+            )
+        except Exception:
+            # Experimental inference must never block the existing rubric result.
+            experimental_ml_prediction = {
+                "status": "prediction_error",
+                "predicted_label": None,
+            }
+
         evaluation, created = (
             Evaluation.objects.update_or_create(
                 answer=self.answer,
@@ -1025,6 +1037,7 @@ class AnswerEvaluator:
                     "follow_up_required": follow_up_required,
                     "recommended_difficulty": recommended_difficulty,
                     "ai_feedback": feedback,
+                    "experimental_ml_prediction": experimental_ml_prediction,
                 },
             )
         )

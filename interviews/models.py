@@ -204,6 +204,7 @@ class Evaluation(models.Model):
     )
 
     ai_feedback = models.TextField(blank=True)
+    experimental_ml_prediction = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -7,6 +7,7 @@ requires-python = ">=3.14"
 dependencies = [
     "django>=6.1.1",
     "python-dotenv>=1.0",
+    "scikit-learn>=1.5,<2.0",
     "sentence-transformers>=6.1.0",
     "speechbrain>=1.1.1",
 ]

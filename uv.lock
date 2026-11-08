@@ -9,6 +9,7 @@ source = { editable = "." }
 dependencies = [
     { name = "django" },
     { name = "python-dotenv" },
+    { name = "scikit-learn" },
     { name = "sentence-transformers" },
     { name = "speechbrain" },
 ]
@@ -17,6 +18,7 @@ dependencies = [
 requires-dist = [
     { name = "django", specifier = ">=6.1.1" },
     { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "scikit-learn", specifier = ">=1.5,<2.0" },
     { name = "sentence-transformers", specifier = ">=6.1.0" },
     { name = "speechbrain", specifier = ">=1.1.1" },
 ]

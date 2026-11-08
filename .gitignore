@@ -11,6 +11,7 @@ wheels/
 # Local environment and secrets
 .env
 .env.*
+/artifacts/experimental_answer_classifier.joblib
 
 # Local database - keep out of Git history
 db.sqlite3
@@ -25,3 +26,6 @@ db.sqlite3
 # Local question engine backups
 interviews/question_engine_backup.py
 interviews/question_engine_adaptive_backup.py
+README.github.tmp
+*.pre_ml_backup
+tash apply stash@{0}
